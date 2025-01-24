@@ -1,0 +1,355 @@
+# Modern Web Application Starter Project Guide
+
+## Project Overview
+This starter project provides a robust foundation for building modern web applications using Next.js 14 with TypeScript. It integrates essential tools and best practices to help developers quickly bootstrap production-ready applications with built-in authentication, database connectivity, and API handling.
+
+## Project Goals
+The primary goals of this starter project are to:
+1. Provide a type-safe development environment using TypeScript
+2. Implement secure authentication and authorization flows
+3. Establish reliable database connectivity with proper error handling
+4. Create a scalable and maintainable project structure
+5. Demonstrate best practices for modern web development
+6. Enable rapid development without compromising code quality
+
+## Technology Stack
+- Next.js 14 with App Router
+- TypeScript for type safety
+- Clerk for authentication
+- Supabase for database
+- TailwindCSS for styling
+- Axios for API requests
+
+## Development Tasks and Instructions
+
+### Task 1: Project Initialization
+**Goal**: Set up the base project with all necessary dependencies.
+
+**Instructions**:
+```bash
+# Create new Next.js project
+npx create-next-app@latest starter-project --typescript --tailwind --eslint
+cd starter-project
+
+# Install additional dependencies
+npm install @clerk/nextjs @supabase/supabase-js axios
+
+# Verify installation
+npm run dev
+```
+
+**Validation**:
+- Project runs without errors at http://localhost:3000
+- TypeScript compilation succeeds
+- All dependencies are properly listed in package.json
+
+### Task 2: Environment Configuration
+**Goal**: Establish secure configuration management.
+
+**Instructions**:
+1. Create `.env.local`:
+```plaintext
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=your_clerk_key
+CLERK_SECRET_KEY=your_secret_key
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+```
+
+2. Create environment types in `types/env.d.ts`:
+```typescript
+declare namespace NodeJS {
+  interface ProcessEnv {
+    NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: string;
+    CLERK_SECRET_KEY: string;
+    NEXT_PUBLIC_SUPABASE_URL: string;
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: string;
+  }
+}
+```
+
+### Task 3: Authentication Implementation
+**Goal**: Set up secure user authentication flow.
+
+**Instructions**:
+1. Create `middleware.ts`:
+```typescript
+import { authMiddleware } from "@clerk/nextjs";
+
+export default authMiddleware({
+  publicRoutes: ["/", "/api/public"]
+});
+
+export const config = {
+  matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
+};
+```
+
+2. Update `app/layout.tsx`:
+```typescript
+import { ClerkProvider } from '@clerk/nextjs';
+import { Inter } from 'next/font/google';
+import './globals.css';
+
+const inter = Inter({ subsets: ['latin'] });
+
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <ClerkProvider>
+      <html lang="en">
+        <body className={inter.className}>{children}</body>
+      </html>
+    </ClerkProvider>
+  );
+}
+```
+
+### Task 4: Database Configuration
+**Goal**: Establish type-safe database connectivity.
+
+**Instructions**:
+1. Create `lib/supabase.ts`:
+```typescript
+import { createClient } from '@supabase/supabase-js';
+import { Database } from '@/types/supabase';
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+
+export async function handleDatabaseError<T>(
+  operation: () => Promise<T>
+): Promise<{ data: T | null; error: string | null }> {
+  try {
+    const result = await operation();
+    return { data: result, error: null };
+  } catch (error) {
+    console.error('Database operation failed:', error);
+    return { data: null, error: 'Database operation failed' };
+  }
+}
+```
+
+### Task 5: API Client Setup
+**Goal**: Configure consistent API request handling.
+
+**Instructions**:
+1. Create `lib/axios.ts`:
+```typescript
+import axios from 'axios';
+
+const axiosInstance = axios.create({
+  baseURL: '/api',
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+axiosInstance.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Handle authentication error
+      window.location.href = '/sign-in';
+    }
+    return Promise.reject(error);
+  }
+);
+
+export default axiosInstance;
+```
+
+### Task 6: Type Definitions
+**Goal**: Ensure comprehensive type safety.
+
+**Instructions**:
+1. Create `types/index.ts`:
+```typescript
+export interface User {
+  id: string;
+  email: string;
+  name?: string;
+  createdAt: Date;
+}
+
+export interface ApiResponse<T> {
+  data: T | null;
+  error: string | null;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+```
+
+### Task 7: Protected Routes Example
+**Goal**: Demonstrate authentication flow.
+
+**Instructions**:
+1. Create `app/api/protected/route.ts`:
+```typescript
+import { auth } from '@clerk/nextjs';
+import { NextResponse } from 'next/server';
+import { supabase } from '@/lib/supabase';
+
+export async function GET() {
+  const { userId } = auth();
+  
+  if (!userId) {
+    return new NextResponse("Unauthorized", { status: 401 });
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('clerk_id', userId)
+      .single();
+
+    if (error) throw error;
+    
+    return NextResponse.json(data);
+  } catch (error) {
+    console.error('API error:', error);
+    return new NextResponse("Internal Server Error", { status: 500 });
+  }
+}
+```
+
+### Task 8: Utility Functions
+**Goal**: Provide common helper functions.
+
+**Instructions**:
+1. Create `utils/index.ts`:
+```typescript
+export function formatDate(date: Date): string {
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  }).format(date);
+}
+
+export function handleApiError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return 'An unexpected error occurred';
+}
+
+export function validateEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email);
+}
+```
+
+## Best Practices
+1. Always use TypeScript's strict mode
+2. Implement proper error handling at all levels
+3. Use meaningful commit messages following conventional commits
+4. Keep components small and focused
+5. Write tests for critical functionality
+6. Document complex logic and important decisions
+7. Follow the DRY (Don't Repeat Yourself) principle
+
+## Getting Started
+1. Clone the repository
+2. Install dependencies with `npm install`
+3. Copy `.env.example` to `.env.local` and fill in your credentials
+4. Run the development server with `npm run dev`
+5. Visit http://localhost:3000
+
+## Development Workflow
+1. Create a new branch for each feature
+2. Write clean, typed code
+3. Test thoroughly
+4. Create a pull request
+5. Get code review
+6. Merge after approval
+
+## Deployment
+1. Build the application: `npm run build`
+2. Test the production build: `npm run start`
+3. Deploy to your preferred platform (Vercel recommended)
+
+This starter project provides a solid foundation for building modern web applications. It emphasizes type safety, security, and maintainability while providing the flexibility to adapt to specific project requirements.
+
+When providing assistance for this Next.js starter project, please follow these guidelines:
+
+Technical Standards:
+- Use TypeScript with strict type checking enabled
+- Implement functional components with proper type definitions
+- Utilize React hooks for state management and side effects
+- Follow the Next.js 14 App Router conventions
+- Implement proper error boundaries and loading states
+- Use Tailwind CSS for styling, avoiding custom CSS unless necessary
+- Follow proper folder structure and file naming conventions
+- Ensure all database operations are properly typed with Supabase
+- Implement proper authentication checks with Clerk
+- Use proper error handling patterns across the application
+
+Code Quality:
+- Write self-documenting code with clear variable and function names
+- Include detailed comments for complex logic
+- Break down complex components into smaller, reusable pieces
+- Follow the Single Responsibility Principle
+- Implement proper TypeScript interfaces and types
+- Use proper dependency injection patterns
+- Follow React best practices and patterns
+
+Response Style:
+- Provide thorough explanations for architectural decisions
+- Include relevant code examples with proper TypeScript types
+- Explain the reasoning behind specific implementations
+- Break down complex problems into manageable steps
+- Address potential edge cases and error scenarios
+- Include proper error handling strategies
+- Provide context for security-related decisions
+
+Documentation:
+- Include proper JSDoc comments for functions and components
+- Document all available props for components
+- Explain any non-obvious implementations
+- Include usage examples for reusable components
+- Document any required environment variables
+- Provide clear setup instructions
+- Include proper type definitions and interfaces
+
+Assumptions:
+- The developer has basic knowledge of React and TypeScript
+- They understand Next.js fundamentals
+- They are familiar with modern JavaScript practices
+- They understand basic authentication concepts
+- They have working knowledge of Git
+
+You should:
+- Provide complete, working solutions rather than snippets
+- Explain the reasoning behind architectural decisions
+- Include proper error handling in all examples
+- Consider performance implications
+- Address security concerns where relevant
+- Suggest best practices and improvements
+- Provide alternatives when relevant
+
+You should not:
+- Skip type definitions or error handling
+- Provide incomplete code examples
+- Use deprecated patterns or methods
+- Ignore security implications
+- Skip proper validation and error checks
+- Use class components instead of functional components
+- Mix different styling approaches
+
+For all code examples:
+- Include proper import statements
+- Show complete component implementations
+- Include proper type definitions
+- Show proper error handling
+- Include loading states where appropriate
+- Show proper form validation
+- Implement proper security checks
