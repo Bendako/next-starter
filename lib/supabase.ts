@@ -1,33 +1,29 @@
+// File: lib/supabase.ts
+
 import { createClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/supabase';  // This imports our generated types
 
-// Define a basic database type structure
-export type Database = {
-  public: {
-    Tables: {
-      users: {
-        Row: {
-          id: string;
-          email: string;
-          name: string | null;
-          created_at: string;
-        };
-        Insert: {
-          id?: string;
-          email: string;
-          name?: string | null;
-        };
-        Update: {
-          id?: string;
-          email?: string;
-          name?: string | null;
-        };
-      };
-      // Add other tables as needed
-    };
-  };
-};
+// Ensure environment variables are available
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL) {
+    throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_URL');
+}
+if (!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    throw new Error('Missing environment variable: NEXT_PUBLIC_SUPABASE_ANON_KEY');
+}
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Initialize the Supabase client with our generated types
+export const supabase = createClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+);
 
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
+// Optionally, create helper functions that use the typed client
+// export async function getUser(userId: string) {
+//     const { data, error } = await supabase
+//         .from('users')
+//         .select('*')
+//         .eq('id', userId)
+//         .single();
+        
+//     return { data, error };
+// }
