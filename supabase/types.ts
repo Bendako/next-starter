@@ -9,22 +9,32 @@ export type Json =
 export interface Database {
   public: {
     Tables: {
-      [key: string]: {
-        Row: Record<string, unknown>;
-        Insert: Record<string, unknown>;
-        Update: Record<string, unknown>;
-      };
-    };
-    Views: {
-      [key: string]: {
-        Row: Record<string, unknown>;
-      };
-    };
-    Functions: {
-      [key: string]: unknown;
-    };
-    Enums: {
-      [key: string]: unknown;
-    };
-  };
+      users: {
+        Row: {
+          id: string
+          created_at: string
+          email: string
+          clerkId: string
+          name: string | null
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          email: string
+          clerkId: string
+          name?: string | null
+        }
+        Update: {
+          id?: string
+          created_at?: string
+          email?: string
+          clerkId?: string
+          name?: string | null
+        }
+      }
+    }
+    Views: Record<string, unknown>
+    Functions: Record<string, unknown>
+    Enums: Record<string, unknown>
+  }
 }
